@@ -1,0 +1,169 @@
+import 'package:flutter/material.dart';
+import 'package:frontend/api_service.dart';
+import 'package:frontend/employee_model.dart';
+
+class EmployeeCRUDPage extends StatefulWidget {
+  @override
+  _EmployeeCRUDPageState createState() => _EmployeeCRUDPageState();
+}
+
+class _EmployeeCRUDPageState extends State<EmployeeCRUDPage> {
+  final _formKey = GlobalKey<FormState>();
+  final nameController = TextEditingController();
+  final emailController = TextEditingController();
+  final phoneController = TextEditingController();
+
+  Employee? editingEmployee;
+  List<Employee> employeeList = [];
+  bool isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    loadEmployees();
+  }
+
+  void loadEmployees() async {
+    setState(() => isLoading = true);
+    employeeList = await ApiService().getEmployees();
+    setState(() => isLoading = false);
+  }
+
+  void refresh() {
+    loadEmployees();
+    editingEmployee = null;
+    nameController.clear();
+    emailController.clear();
+    phoneController.clear();
+  }
+
+  void saveOrUpdateEmployee() async {
+    if (_formKey.currentState!.validate()) {
+      final newEmployee = Employee(
+        id: editingEmployee?.id ?? 0,
+        name: nameController.text,
+        email: emailController.text,
+        phone: phoneController.text,
+      );
+
+      if (editingEmployee == null) {
+        await ApiService().createEmployee(newEmployee);
+      } else {
+        await ApiService().updateEmployee(editingEmployee!.id, newEmployee);
+      }
+
+      refresh();
+    }
+  }
+
+  void fillForm(Employee employee) {
+    setState(() {
+      editingEmployee = employee;
+      nameController.text = employee.name;
+      emailController.text = employee.email;
+      phoneController.text = employee.phone;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Employee CRUD')),
+      body: Column(
+        children: [
+          // Form Section
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: nameController,
+                    decoration: InputDecoration(labelText: 'Name'),
+                    validator: (value) =>
+                        value!.isEmpty ? 'Please enter a name' : null,
+                  ),
+                  TextFormField(
+                    controller: emailController,
+                    decoration: InputDecoration(labelText: 'Email'),
+                    validator: (value) =>
+                        value!.isEmpty ? 'Please enter an email' : null,
+                  ),
+                  TextFormField(
+                    controller: phoneController,
+                    decoration: InputDecoration(labelText: 'Phone'),
+                    validator: (value) =>
+                        value!.isEmpty ? 'Please enter a phone' : null,
+                  ),
+                  SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ElevatedButton(
+                        onPressed: editingEmployee == null
+                            ? saveOrUpdateEmployee
+                            : null,
+                        child: Text('Create'),
+                      ),
+                      SizedBox(width: 10),
+                      ElevatedButton(
+                        onPressed: editingEmployee != null
+                            ? saveOrUpdateEmployee
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange),
+                        child: Text('Update'),
+                      ),
+                      SizedBox(width: 10),
+                      OutlinedButton(
+                        onPressed: editingEmployee != null
+                            ? () {
+                                setState(() {
+                                  editingEmployee = null;
+                                  nameController.clear();
+                                  emailController.clear();
+                                  phoneController.clear();
+                                });
+                              }
+                            : null,
+                        child: Text('Cancel'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Employee List Section
+          Expanded(
+            child: isLoading
+                ? Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    itemCount: employeeList.length,
+                    itemBuilder: (context, index) {
+                      final emp = employeeList[index];
+                      return Card(
+                        margin:
+                            EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        child: ListTile(
+                          title: Text(emp.name),
+                          subtitle: Text(emp.email),
+                          trailing: IconButton(
+                            icon: Icon(Icons.delete),
+                            onPressed: () async {
+                              await ApiService().deleteEmployee(emp.id);
+                              refresh();
+                            },
+                          ),
+                          onTap: () => fillForm(emp),
+                        ),
+                      );
+                    },
+                  ),
+          )
+        ],
+      ),
+    );
+  }
+}
